@@ -66,7 +66,7 @@ private fun Project.configureProjectProperties(
             "../crates/gobley-uniffi-bindgen/Cargo.toml"
         ).asFile
     )
-    group = "dev.gobley.gradle"
+    group = "com.nedap.healthcare.gobley"
     version = when {
         bindgenManifest.version.contains('-') -> bindgenManifest.version.substringBefore('-') + "-SNAPSHOT"
         else -> bindgenManifest.version
