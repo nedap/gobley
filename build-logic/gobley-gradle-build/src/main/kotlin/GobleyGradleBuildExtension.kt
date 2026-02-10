@@ -13,8 +13,10 @@ import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import com.vanniktech.maven.publish.SonatypeHost
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
+import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+import org.jfrog.gradle.plugin.artifactory.dsl.ArtifactoryPluginConvention
 
 abstract class GobleyGradleBuildExtension(private val project: Project) {
     val uniffiBindgenManifest = CargoManifest.fromFile(
@@ -56,6 +58,7 @@ private fun Project.configureGobleyGradleProject(
         }
     }
     configureMavenCentralPublishing(gradlePlugin, signing)
+    configureJfrogPublishing()
 }
 
 private fun Project.configureProjectProperties(
@@ -66,7 +69,7 @@ private fun Project.configureProjectProperties(
             "../crates/gobley-uniffi-bindgen/Cargo.toml"
         ).asFile
     )
-    group = "dev.gobley.gradle"
+    group = "com.nedap.healthcare.gobley"
     version = when {
         bindgenManifest.version.contains('-') -> bindgenManifest.version.substringBefore('-') + "-SNAPSHOT"
         else -> bindgenManifest.version
@@ -129,6 +132,35 @@ private fun Project.configureMavenCentralPublishing(gradlePlugin: Boolean, signi
             }
         }
     }
+}
+
+private fun Project.configureJfrogPublishing() {
+    plugins.apply("com.jfrog.artifactory")
+    
+    afterEvaluate {
+        val artifactoryCredentials = getArtifactoryCredentials()
+        val isSnapshot = version.toString().contains("-SNAPSHOT") || version.toString().contains("-")
+        val repositoryPath = if (isSnapshot) "libs-snapshots-local" else "libs-releases-local"
+        
+        extensions.configure<ArtifactoryPluginConvention> {
+            setContextUrl("https://nedap.jfrog.io/nedap")
+            publish {
+                repository {
+                    repoKey = repositoryPath
+                    username = artifactoryCredentials.first
+                    password = artifactoryCredentials.second
+                }
+                defaults {
+                    publications("ALL_PUBLICATIONS")
+                }
+            }
+        }
+    }
+}
+
+private fun Project.getArtifactoryCredentials(): Pair<String?, String?> {
+    return findProperty("artifactoryUser") as String? to 
+           findProperty("artifactoryPassword") as String?
 }
 
 private fun Project.propertyOrEnv(propertyName: String, envName: String = propertyName): String? {

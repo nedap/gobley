@@ -1,0 +1,72 @@
+name: Publish Gobley Plugins to JFrog
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - 'build-logic/**'
+      - 'crates/gobley-uniffi-bindgen/Cargo.toml'
+      - '.github/workflows/publish-jfrog.yml'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Publish Gobley Plugins to JFrog Artifactory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      
+      - name: Build plugins
+        run: |
+          ./gradlew :build-logic:gobley-gradle-cargo:build \
+                   :build-logic:gobley-gradle-uniffi:build \
+                   :build-logic:gobley-gradle-rust:build \
+                   :build-logic:gobley-gradle:build \
+                   --no-daemon -x test \
+                   -Pgobley.projects.examples.app=false \
+                   -Pgobley.projects.examples.audioCppApp=false \
+                   -Pgobley.projects.examples.customTypes=false \
+                   -Pgobley.projects.examples.tokioBlake3App=false \
+                   -Pgobley.projects.examples.tokioBoringApp=false \
+                   -Pgobley.projects.gradleTests=false \
+                   -Pgobley.projects.uniffiTests=false \
+                   -Pgobley.projects.uniffiTests.extTypes=false \
+                   -Pgobley.projects.uniffiTests.extTypes=false
+      
+      - name: Publish to JFrog Artifactory
+        env:
+          ORG_GRADLE_PROJECT_artifactoryUser: ${{ secrets.HC_JFROG_USER }}
+          ORG_GRADLE_PROJECT_artifactoryPassword: ${{ secrets.HC_JFROG_PASSWORD }}
+        run: |
+          ./gradlew :build-logic:gobley-gradle-cargo:artifactoryPublish \
+                   :build-logic:gobley-gradle-uniffi:artifactoryPublish \
+                   :build-logic:gobley-gradle-rust:artifactoryPublish \
+                   :build-logic:gobley-gradle:artifactoryPublish \
+                   --no-daemon \
+                   -Pgobley.projects.examples.app=false \
+                   -Pgobley.projects.examples.audioCppApp=false \
+                   -Pgobley.projects.examples.customTypes=false \
+                   -Pgobley.projects.examples.tokioBlake3App=false \
+                   -Pgobley.projects.examples.tokioBoringApp=false \
+                   -Pgobley.projects.gradleTests=false \
+                   -Pgobley.projects.uniffiTests=false \
+                   -Pgobley.projects.uniffiTests.extTypes=false
+      
+      - name: Verify Publication
+        run: |
+          echo "✅ Published Gobley plugins to JFrog Artifactory"
+          echo "Check JFrog Artifactory to verify artifacts:"
+          echo "https://nedap.jfrog.io/nedap/webapp/#/artifacts/browse/tree/General/libs-releases-local/com/nedap/healthcare/gobley"
